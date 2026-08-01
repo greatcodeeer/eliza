@@ -34,6 +34,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import BlobButton from "@/components/BlobButton";
 import { ElizaLogo } from "@/components/brand/eliza-logo";
 import type {
@@ -174,6 +175,7 @@ function AnimatedLetters({
 
 export default function Leaderboard() {
   const t = useT();
+  const navigate = useNavigate();
   const modelRef = useRef<ModelBHandle>(null);
   const [phoneSettled, setPhoneSettled] = useState(false);
   const [chatRenderState, setChatRenderState] = useState<ChatRenderState>({
@@ -663,6 +665,7 @@ export default function Leaderboard() {
     const oldIndex = prevIndex.current;
     if (newIndex === oldIndex) return;
 
+    prevIndex.current = newIndex;
     setPlatform(newPlatform);
     if (newPlatform !== "try") setTryPlatform(newPlatform);
     setSquishing(true);
@@ -677,7 +680,6 @@ export default function Leaderboard() {
     }
     setTimeout(() => {
       setSquishing(false);
-      prevIndex.current = newIndex;
     }, 100);
 
     if (newIndex === 0) {
@@ -941,7 +943,7 @@ export default function Leaderboard() {
                 />
                 <AnimatedButton
                   type="button"
-                  onClick={() => changePlatform("try")}
+                  onClick={() => navigate("/get-started")}
                   className="relative z-2 flex h-full w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-full text-base font-semibold text-neutral-900"
                   style={{ opacity: tryAppearSpring.tryOpacity }}
                 >
