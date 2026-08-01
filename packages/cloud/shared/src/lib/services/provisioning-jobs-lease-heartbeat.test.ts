@@ -68,7 +68,7 @@ async function wait(milliseconds: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function within<T>(promise: Promise<T>, milliseconds = 2_000): Promise<T> {
+async function within<T>(promise: Promise<T>, milliseconds = 500): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -92,20 +92,18 @@ function captureHeartbeatTimer() {
     unref: mock(() => undefined),
   } as unknown as ReturnType<typeof setInterval>;
 
-  const setIntervalMock = spyOn(globalThis, "setInterval").mockImplementation(
-    ((handler: Parameters<typeof setInterval>[0]) => {
-      if (typeof handler !== "function") {
-        throw new TypeError("Expected an interval callback");
-      }
-      callback.resolve(() => handler());
-      return timer;
-    }) as typeof setInterval,
-  );
-  const clearIntervalMock = spyOn(globalThis, "clearInterval").mockImplementation(
-    (handle) => {
-      if (handle === timer) cleared.resolve();
-    },
-  );
+  const setIntervalMock = spyOn(globalThis, "setInterval").mockImplementation(((
+    handler: Parameters<typeof setInterval>[0],
+  ) => {
+    if (typeof handler !== "function") {
+      throw new TypeError("Expected an interval callback");
+    }
+    callback.resolve(() => handler());
+    return timer;
+  }) as typeof setInterval);
+  const clearIntervalMock = spyOn(globalThis, "clearInterval").mockImplementation((handle) => {
+    if (handle === timer) cleared.resolve();
+  });
 
   return {
     callback: callback.promise,
@@ -185,10 +183,9 @@ describe("execution-lease heartbeat", () => {
 
     expect(result).toMatchObject({ claimed: 1, succeeded: 1, failed: 0 });
     expect(renew.mock.calls).toHaveLength(2);
-    expect(heartbeatTimer.clearIntervalMock).toHaveBeenCalledWith(
-      heartbeatTimer.timer,
-    );
+    expect(heartbeatTimer.clearIntervalMock).toHaveBeenCalledWith(heartbeatTimer.timer);
     expect(heartbeatTimer.setIntervalMock).toHaveBeenCalledTimes(1);
+    expect(heartbeatTimer.setIntervalMock).toHaveBeenCalledWith(expect.any(Function), 20);
   });
 
   test("stops quietly when the transaction observes normal settlement", async () => {
@@ -216,9 +213,7 @@ describe("execution-lease heartbeat", () => {
     }
 
     expect(renew.mock.calls).toHaveLength(1);
-    expect(heartbeatTimer.clearIntervalMock).toHaveBeenCalledWith(
-      heartbeatTimer.timer,
-    );
+    expect(heartbeatTimer.clearIntervalMock).toHaveBeenCalledWith(heartbeatTimer.timer);
     expect(
       warn.mock.calls.filter(([message]) => String(message).includes("ownership was lost")),
     ).toHaveLength(0);
@@ -249,9 +244,7 @@ describe("execution-lease heartbeat", () => {
     }
 
     expect(renew.mock.calls).toHaveLength(1);
-    expect(heartbeatTimer.clearIntervalMock).toHaveBeenCalledWith(
-      heartbeatTimer.timer,
-    );
+    expect(heartbeatTimer.clearIntervalMock).toHaveBeenCalledWith(heartbeatTimer.timer);
     expect(
       warn.mock.calls.filter(([message]) => String(message).includes("ownership was lost")),
     ).toHaveLength(1);
