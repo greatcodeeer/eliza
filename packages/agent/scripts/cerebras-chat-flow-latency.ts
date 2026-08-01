@@ -21,10 +21,11 @@ import {
   type InferenceHistogramSummary,
   InferenceTurnTimer,
   inferenceTimingRegistry,
+  isSensitiveKeyName,
   type Memory,
   type ModelEventPayload,
   ModelType,
-  redactLogArgs,
+  redactSensitiveText,
   runWithInferenceTiming,
   type UUID,
 } from "@elizaos/core";
@@ -88,12 +89,37 @@ export interface ModelInputEvidence {
   stream?: boolean;
 }
 
+function isTokenMetricKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return (
+    normalized.endsWith("tokens") ||
+    normalized.endsWith("tokencount") ||
+    normalized === "maxtokens"
+  );
+}
+
+function redactEvidenceValue(value: unknown, seen: WeakSet<object>): unknown {
+  if (typeof value === "string") return redactSensitiveText(value);
+  if (typeof value === "bigint") return value.toString();
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return "[Circular]";
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactEvidenceValue(entry, seen));
+  }
+  const redacted: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    redacted[key] =
+      isSensitiveKeyName(key) && !isTokenMetricKey(key)
+        ? "[REDACTED]"
+        : redactEvidenceValue(entry, seen);
+  }
+  return redacted;
+}
+
 function jsonEvidence(value: unknown): unknown {
-  const redacted = redactLogArgs([value])[0];
   return JSON.parse(
-    JSON.stringify(redacted, (_key, entry) =>
-      typeof entry === "bigint" ? entry.toString() : entry,
-    ),
+    JSON.stringify(redactEvidenceValue(value, new WeakSet<object>())),
   );
 }
 
