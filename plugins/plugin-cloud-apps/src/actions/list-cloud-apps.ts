@@ -80,14 +80,12 @@ export const listCloudAppsAction: Action = {
     }
 
     let response: Awaited<ReturnType<typeof client.listApps>>;
+    // error-policy:J1 The action boundary translates only the Cloud request;
+    // connector delivery remains owned by the caller and must reject unchanged.
     try {
       response = await client.listApps();
     } catch (err) {
-      logger.warn(
-        `[LIST_CLOUD_APPS] Failed to list apps: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+      logger.warn({ err }, "[LIST_CLOUD_APPS] Failed to list apps");
       await callback?.({ text: ERROR_MESSAGE, actions: ["LIST_CLOUD_APPS"] });
       return {
         success: false,
