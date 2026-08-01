@@ -105,7 +105,9 @@ function redactEvidenceValue(value: unknown, seen: WeakSet<object>): unknown {
   if (seen.has(value)) return "[Circular]";
   seen.add(value);
   if (Array.isArray(value)) {
-    return value.map((entry) => redactEvidenceValue(entry, seen));
+    const redacted = value.map((entry) => redactEvidenceValue(entry, seen));
+    seen.delete(value);
+    return redacted;
   }
   const redacted: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value)) {
@@ -114,6 +116,7 @@ function redactEvidenceValue(value: unknown, seen: WeakSet<object>): unknown {
         ? "[REDACTED]"
         : redactEvidenceValue(entry, seen);
   }
+  seen.delete(value);
   return redacted;
 }
 

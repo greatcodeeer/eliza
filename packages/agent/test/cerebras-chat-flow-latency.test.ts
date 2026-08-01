@@ -15,6 +15,7 @@ import {
 
 describe("Cerebras chat-flow latency helpers", () => {
   it("captures exact model input with phase context without leaking unrelated fields", () => {
+    const sharedBreakpoints = [{ segmentIndex: 2 }];
     expect(
       captureModelInput(
         "RESPONSE_HANDLER",
@@ -27,6 +28,8 @@ describe("Cerebras chat-flow latency helpers", () => {
               apiKey: "must-not-be-captured",
               headers: { Authorization: "Bearer must-not-be-captured" },
             },
+            eliza: { cacheBreakpoints: sharedBreakpoints },
+            anthropic: { cacheBreakpoints: sharedBreakpoints },
           },
           maxTokens: 128,
           stream: true,
@@ -45,10 +48,20 @@ describe("Cerebras chat-flow latency helpers", () => {
           apiKey: "[REDACTED]",
           headers: { Authorization: "[REDACTED]" },
         },
+        eliza: { cacheBreakpoints: [{ segmentIndex: 2 }] },
+        anthropic: { cacheBreakpoints: [{ segmentIndex: 2 }] },
       },
       maxTokens: 128,
       stream: true,
     });
+  });
+
+  it("breaks cycles without hiding repeated non-secret evidence", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    expect(
+      captureModelInput("RESPONSE_HANDLER", { providerOptions: cyclic }, null),
+    ).toMatchObject({ providerOptions: { self: "[Circular]" } });
   });
 
   it("uses nearest-rank percentiles and reports the full distribution", () => {
