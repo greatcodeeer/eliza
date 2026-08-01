@@ -67,6 +67,7 @@ import type {
   ConversationMessageSearchResult,
   ImageAttachment,
 } from "../../api/client-types-chat";
+import { registerAppShellPage } from "../../app-shell-registry";
 import { reportComposerActivity } from "../../chat/report-composer-activity";
 import {
   CHAT_PREFILL_EVENT,
@@ -109,6 +110,13 @@ import {
 beforeAll(() => {
   // jsdom has no scrollIntoView; the overlay calls it when the thread grows.
   Element.prototype.scrollIntoView = vi.fn();
+  registerAppShellPage({
+    id: "polymarket",
+    pluginId: "@elizaos/plugin-polymarket",
+    label: "Polymarket",
+    path: "/polymarket",
+    tabAffinity: "inventory",
+  });
 });
 
 // Unmount between tests so renders don't accumulate in the shared document.
@@ -813,6 +821,43 @@ describe("ChatOverlay", () => {
     );
     expect(document.activeElement).toBe(composer);
   });
+
+  it.each([
+    [
+      "an explicit registered route",
+      { viewId: "polymarket", viewPath: "/polymarket" },
+    ],
+    ["a direct registered view id", { viewId: "polymarket" }],
+  ])(
+    "preserves focused typing through %s with a different tab affinity",
+    (_label, target) => {
+      const { rerender } = render(
+        <ChatOverlay
+          controller={makeController({
+            currentTab: "chat",
+          } as Partial<ShellController>)}
+        />,
+      );
+      const composer = screen.getByLabelText("message");
+      act(() => {
+        composer.focus();
+        window.dispatchEvent(
+          new CustomEvent(NAVIGATE_VIEW_EVENT, {
+            detail: { ...target, source: "agent" },
+          }),
+        );
+      });
+
+      rerender(
+        <ChatOverlay
+          controller={makeController({
+            currentTab: "inventory",
+          } as Partial<ShellController>)}
+        />,
+      );
+      expect(document.activeElement).toBe(composer);
+    },
+  );
 
   it("does not arm a focus lease for an agent open-window action", () => {
     const { rerender } = render(
