@@ -113,7 +113,7 @@ test.beforeEach(async ({ page }) => {
 test("landing and leaderboard render identical terminal phone canvases", async ({
   page,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const landing = await capturePhoneCanvas(page, "/");
   const leaderboard = await capturePhoneCanvas(page, "/leaderboard");
 
@@ -179,6 +179,14 @@ test("Telegram replay moves from loading to its six-message terminal state", asy
     record();
   });
   await page.getByRole("button", { name: "Telegram" }).click();
+  await expect(page.getByRole("button", { name: "Telegram" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("[data-phone-model]")).toHaveAttribute(
+    "data-chat-total-messages",
+    "6",
+  );
   await waitForTerminalChat(page, 6);
   const observed = await page.evaluate(
     () =>

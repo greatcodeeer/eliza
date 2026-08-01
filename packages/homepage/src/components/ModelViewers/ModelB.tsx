@@ -1020,6 +1020,8 @@ function FovZoom({ runtime }: { runtime: ModelRuntime }) {
   const initialized = useRef(false);
   const started = useRef(false);
   const completed = useRef(false);
+  const readinessFrame = useRef(0);
+  const renderedReadinessFrame = useRef(0);
   const invalidate = useThree((state) => state.invalidate);
 
   useEffect(() => {
@@ -1027,7 +1029,11 @@ function FovZoom({ runtime }: { runtime: ModelRuntime }) {
       started.current = true;
       invalidate();
     }, runtime.introDelay);
-    return () => window.clearTimeout(timeout);
+    return () => {
+      window.clearTimeout(timeout);
+      cancelAnimationFrame(readinessFrame.current);
+      cancelAnimationFrame(renderedReadinessFrame.current);
+    };
   }, [invalidate, runtime]);
 
   useFrame((state, delta) => {
@@ -1043,8 +1049,15 @@ function FovZoom({ runtime }: { runtime: ModelRuntime }) {
       if (!completed.current) {
         completed.current = true;
         runtime.cameraZoomDone = true;
-        runtime.onReady?.();
         state.invalidate();
+        // R3F renders after useFrame callbacks. Readiness is observable only
+        // after the final camera projection has reached the canvas.
+        readinessFrame.current = requestAnimationFrame(() => {
+          state.invalidate();
+          renderedReadinessFrame.current = requestAnimationFrame(() => {
+            runtime.onReady?.();
+          });
+        });
       }
       return;
     }
