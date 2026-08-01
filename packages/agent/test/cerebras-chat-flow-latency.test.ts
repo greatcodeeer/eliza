@@ -21,7 +21,13 @@ describe("Cerebras chat-flow latency helpers", () => {
         {
           messages: [{ role: "user", content: "hello" }],
           promptSegments: [{ content: "hello", stable: false }],
-          providerOptions: { cerebras: { prompt_cache_key: "cache-key" } },
+          providerOptions: {
+            cerebras: {
+              prompt_cache_key: "cache-key",
+              apiKey: "must-not-be-captured",
+              headers: { Authorization: "Bearer must-not-be-captured" },
+            },
+          },
           maxTokens: 128,
           stream: true,
           apiKey: "must-not-be-captured",
@@ -33,7 +39,13 @@ describe("Cerebras chat-flow latency helpers", () => {
       modelType: "RESPONSE_HANDLER",
       messages: [{ role: "user", content: "hello" }],
       promptSegments: [{ content: "hello", stable: false }],
-      providerOptions: { cerebras: { prompt_cache_key: "cache-key" } },
+      providerOptions: {
+        cerebras: {
+          prompt_cache_key: "cache-key",
+          apiKey: "[REDACTED]",
+          headers: { Authorization: "[REDACTED]" },
+        },
+      },
       maxTokens: 128,
       stream: true,
     });

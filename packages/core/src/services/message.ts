@@ -4036,10 +4036,10 @@ function renderMessageHandlerModelInput(
 			segment.label?.startsWith("prior_message:") !== true &&
 			segment.label?.startsWith("provider:") !== true,
 	);
-	// This invariant contract anchors the user-message prefix before volatile
-	// provider output, followed by chronological dialogue whose older portion is
-	// append-only. Keeping it in the user message preserves the distinction between
-	// agent identity and instructions for interpreting turn-local blocks.
+	// This invariant contract anchors the user-message prefix, then places the
+	// append-only chronological dialogue before volatile provider output. Keeping
+	// the boundary in the user message preserves the distinction between agent
+	// identity and instructions for interpreting turn-local blocks.
 	const orderedDynamicSegments = [
 		...currentTurnBoundary,
 		...priorDialogueSegments,

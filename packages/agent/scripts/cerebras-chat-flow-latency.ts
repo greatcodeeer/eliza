@@ -7,8 +7,10 @@
  * report retains synthetic prompts and outputs so reviewers can verify that
  * each live response was distinct rather than served by a fabricated fallback.
  */
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import {
   buildInferenceTimingDevPayload,
   ChannelType,
@@ -22,6 +24,7 @@ import {
   type Memory,
   type ModelEventPayload,
   ModelType,
+  redactLogArgs,
   runWithInferenceTiming,
   type UUID,
 } from "@elizaos/core";
@@ -86,7 +89,30 @@ export interface ModelInputEvidence {
 }
 
 function jsonEvidence(value: unknown): unknown {
-  return JSON.parse(JSON.stringify(value));
+  const redacted = redactLogArgs([value])[0];
+  return JSON.parse(
+    JSON.stringify(redacted, (_key, entry) =>
+      typeof entry === "bigint" ? entry.toString() : entry,
+    ),
+  );
+}
+
+function sourceRevisionEvidence(): { head: string; treeClean: true } {
+  const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+  const head = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], {
+    encoding: "utf8",
+  }).trim();
+  const dirty = execFileSync(
+    "git",
+    ["-C", repoRoot, "status", "--porcelain", "--untracked-files=no"],
+    { encoding: "utf8" },
+  ).trim();
+  if (dirty) {
+    throw new Error(
+      "Live Cerebras evidence must run from a clean committed source tree",
+    );
+  }
+  return { head, treeClean: true };
 }
 
 export function captureModelInput(
@@ -703,6 +729,7 @@ async function main(): Promise<void> {
 
     const report = {
       generatedAt: new Date().toISOString(),
+      sourceRevision: sourceRevisionEvidence(),
       runtime: "AgentRuntime + plugin-sql/PGLite + plugin-openai",
       endpoint: process.env.CEREBRAS_BASE_URL,
       model,
