@@ -147,11 +147,16 @@ describe("execution-lease heartbeat", () => {
   test("renews while execution is active and stops after success", async () => {
     const job = claimedJob();
     stubLaneClaim(job);
-    const firstRenewal = Promise.withResolvers<void>();
-    const secondRenewal = Promise.withResolvers<void>();
+    const firstRenewalStarted = Promise.withResolvers<void>();
+    const releaseFirstRenewal = Promise.withResolvers<void>();
+    const secondRenewalStarted = Promise.withResolvers<void>();
     const renew = spyOn(jobsRepository, "renewExecutionLease").mockImplementation(async () => {
-      if (renew.mock.calls.length === 1) firstRenewal.resolve();
-      if (renew.mock.calls.length === 2) secondRenewal.resolve();
+      if (renew.mock.calls.length === 1) {
+        firstRenewalStarted.resolve();
+        await releaseFirstRenewal.promise;
+      } else if (renew.mock.calls.length === 2) {
+        secondRenewalStarted.resolve();
+      }
       return "renewed";
     });
     const heartbeatTimer = captureHeartbeatTimer();
@@ -167,18 +172,25 @@ describe("execution-lease heartbeat", () => {
     });
 
     const processing = service.processPendingJobs(1, { jobTypes: [JOB_TYPES.AGENT_LOGS] });
-    await executionStarted.promise;
     let result: Awaited<typeof processing>;
     try {
-      const heartbeat = await heartbeatTimer.callback;
+      await within(executionStarted.promise);
+      const heartbeat = await within(heartbeatTimer.callback);
       heartbeat();
-      await within(firstRenewal.promise);
+      await within(firstRenewalStarted.promise);
+
+      heartbeat();
+      await wait(0);
+      expect(renew.mock.calls).toHaveLength(1);
+
+      releaseFirstRenewal.resolve();
       await wait(0);
       heartbeat();
-      await within(secondRenewal.promise);
+      await within(secondRenewalStarted.promise);
     } finally {
+      releaseFirstRenewal.resolve();
       releaseExecution.resolve();
-      result = await processing;
+      result = await within(processing);
     }
 
     expect(result).toMatchObject({ claimed: 1, succeeded: 1, failed: 0 });
@@ -204,12 +216,12 @@ describe("execution-lease heartbeat", () => {
 
     const processing = service.processPendingJobs(1, { jobTypes: [JOB_TYPES.AGENT_LOGS] });
     try {
-      const heartbeat = await heartbeatTimer.callback;
+      const heartbeat = await within(heartbeatTimer.callback);
       heartbeat();
       await within(heartbeatTimer.cleared);
     } finally {
       releaseExecution.resolve();
-      await processing;
+      await within(processing);
     }
 
     expect(renew.mock.calls).toHaveLength(1);
@@ -235,12 +247,12 @@ describe("execution-lease heartbeat", () => {
 
     const processing = service.processPendingJobs(1, { jobTypes: [JOB_TYPES.AGENT_LOGS] });
     try {
-      const heartbeat = await heartbeatTimer.callback;
+      const heartbeat = await within(heartbeatTimer.callback);
       heartbeat();
       await within(heartbeatTimer.cleared);
     } finally {
       releaseExecution.resolve();
-      await processing;
+      await within(processing);
     }
 
     expect(renew.mock.calls).toHaveLength(1);
