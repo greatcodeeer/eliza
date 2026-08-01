@@ -84,6 +84,31 @@ export function directTabForNavigateView(
   return null;
 }
 
+/**
+ * Resolves the in-shell tab that App activates for a navigate-view event.
+ * Consumers that preserve focus across navigation must use this result rather
+ * than independently interpreting view ids, because registered and canonical
+ * routes can intentionally activate a different tab.
+ */
+export function tabForNavigateViewDetail(
+  detail: NavigateViewDetail,
+  views: readonly ViewRegistryEntry[] = [],
+): Tab | null {
+  if (detail.action === "close" || detail.action === "close-all") {
+    return "chat";
+  }
+  if (detail.action === "split-view" || detail.action === "tile-views") {
+    return "views";
+  }
+
+  const path = pathForNavigateViewDetail(detail, views);
+  if (!path) return null;
+  const directTab = directTabForNavigateView(detail, path);
+  if (directTab) return directTab;
+  if (detail.action === "open-window" && detail.viewId) return null;
+  return tabFromPath(path);
+}
+
 export function navigateBrowserPath(path: string): void {
   if (typeof window === "undefined") return;
   try {
@@ -196,9 +221,13 @@ export function createNavigateViewHandler({
     );
     if (!path) return;
     setViewLayout?.(null);
+    const targetTab = tabForNavigateViewDetail(
+      detail,
+      availableViewsForDesktopTabs,
+    );
     const directTab = directTabForNavigateView(detail, path);
     if (directTab) {
-      setTab(directTab);
+      if (targetTab) setTab(targetTab);
       return;
     }
     if (detail.action === "open-window" && detail.viewId) {
@@ -247,7 +276,7 @@ export function createNavigateViewHandler({
         setActiveDesktopTabId(entry.id);
       }
     }
-    activateTabForPath(path);
+    if (targetTab) setTab(targetTab);
     navigatePath(path);
   };
 }

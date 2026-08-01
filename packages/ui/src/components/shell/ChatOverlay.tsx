@@ -37,7 +37,7 @@ import type {
   ConversationMessageSearchResult,
   ImageAttachment,
 } from "../../api/client-types-chat";
-import { listAppShellPages } from "../../app-shell-registry";
+import { tabForNavigateViewDetail } from "../../app-navigate-view";
 import { useComposerKeydown, useComposerPaste } from "../../chat/composer-core";
 import { reportComposerActivity } from "../../chat/report-composer-activity";
 import {
@@ -71,6 +71,7 @@ import {
   GLASS_SHEET_BACKDROP_FILTER,
   GLASS_SHEET_FILL,
 } from "../../glass/tokens";
+import type { ViewRegistryEntry } from "../../hooks/useAvailableViews";
 import { useConversationRenderWindow } from "../../hooks/useConversationRenderWindow";
 import {
   LAYOUT_SHIFT_INTENT_ATTR,
@@ -80,13 +81,6 @@ import { useLoadOlderOnScroll } from "../../hooks/useLoadOlderOnScroll";
 import { usePushToTalk } from "../../hooks/usePushToTalk";
 import { Z_SHELL_OVERLAY } from "../../lib/floating-layers";
 import { cn } from "../../lib/utils";
-import {
-  type BuiltinTab,
-  pathForTab,
-  TAB_PATHS,
-  type Tab,
-  tabFromPath,
-} from "../../navigation";
 import { claimAssistantLaunchPayloadFromHash } from "../../platform/assistant-launch-payload";
 import { isIOS, isNative, isStandalonePwa } from "../../platform/init";
 import {
@@ -349,41 +343,7 @@ const SHEET_DETENT_MAGNET = 64;
 // it. Release commits the maximize once the morph is at least half-complete.
 const COMPOSER_TYPING_PAUSE_MS = 2_000;
 const COMPOSER_ACTIVITY_SURFACE = "chat_overlay";
-
-function agentNavigationTargetTab(detail: NavigateViewDetail): Tab | null {
-  if (
-    detail.action === "close" ||
-    detail.action === "close-all" ||
-    detail.action === "open-window"
-  ) {
-    return null;
-  }
-  if (detail.action === "split-view" || detail.action === "tile-views") {
-    return "views";
-  }
-
-  const registeredPath = detail.viewId
-    ? listAppShellPages().find((entry) => entry.id === detail.viewId)?.path
-    : undefined;
-  if (
-    detail.viewId &&
-    !registeredPath &&
-    detail.viewPath === `/${detail.viewId}`
-  ) {
-    return detail.viewId;
-  }
-  const builtinPath =
-    detail.viewId && Object.hasOwn(TAB_PATHS, detail.viewId)
-      ? pathForTab(detail.viewId as BuiltinTab)
-      : undefined;
-  const targetPath =
-    detail.viewPath ??
-    registeredPath ??
-    builtinPath ??
-    (detail.viewId ? `/apps/${detail.viewId}` : null);
-
-  return targetPath ? (tabFromPath(targetPath) ?? detail.viewId ?? null) : null;
-}
+const EMPTY_ROUTABLE_VIEWS: readonly ViewRegistryEntry[] = [];
 
 // A light iOS-style impact on each detent cross. Self-contained + guarded so it
 // is a no-op off-native (and in jsdom tests) without coupling the overlay to the
@@ -1312,12 +1272,15 @@ export function ChatOverlay({
   agentName = "Eliza",
   slash: slashProp,
   firstRunOpen = false,
+  availableViews = EMPTY_ROUTABLE_VIEWS,
 }: {
   controller: ShellController;
   /** Name shown in the composer placeholder ("Ask {agentName}"). Defaults to Eliza. */
   agentName?: string;
   /** Universal slash-command catalog + app-level nav effects. */
   slash?: SlashCommandController;
+  /** Routes App can activate; shared with its navigate-view resolver. */
+  availableViews?: readonly ViewRegistryEntry[];
   /**
    * True while in-chat first-run onboarding is active (`firstRunComplete ===
    * false` upstream). The overlay opens as the normal full-screen chat and pins
@@ -3842,7 +3805,12 @@ export function ChatOverlay({
     if (typeof window === "undefined") return undefined;
     const preserveFocusedComposer = (event: Event) => {
       const detail = (event as CustomEvent<NavigateViewDetail>).detail;
-      const targetTab = detail ? agentNavigationTargetTab(detail) : null;
+      const targetTab =
+        detail?.action === "close" || detail?.action === "close-all"
+          ? null
+          : detail
+            ? tabForNavigateViewDetail(detail, availableViews)
+            : null;
       preserveFocusOnAgentNavigationRef.current =
         detail?.source === "agent" &&
         targetTab !== null &&
@@ -3854,7 +3822,7 @@ export function ChatOverlay({
     window.addEventListener(NAVIGATE_VIEW_EVENT, preserveFocusedComposer);
     return () =>
       window.removeEventListener(NAVIGATE_VIEW_EVENT, preserveFocusedComposer);
-  }, []);
+  }, [availableViews]);
 
   // The composer overlay floats over every view and survives tab changes, so
   // navigating away from a focused composer (chat → Settings / Home / …) would

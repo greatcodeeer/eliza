@@ -116,6 +116,25 @@ describe("createNavigateViewHandler guard + fallthrough branches", () => {
     expect(fixture.navigatePath).toHaveBeenCalledWith("/apps/ghost-view");
   });
 
+  it("activates the canonical tab for a built-in route alias", () => {
+    const fixture = createHandlerFixture();
+
+    fixture.handler(navigateEvent({ viewId: "apps", viewPath: "/apps" }));
+
+    expect(fixture.setTab).toHaveBeenCalledWith("my-apps");
+    expect(fixture.navigatePath).toHaveBeenCalledWith("/apps");
+  });
+
+  it("activates views for a direct network-only top-level view", () => {
+    const shopify = view({ id: "shopify", path: "/shopify" });
+    const fixture = createHandlerFixture([shopify]);
+
+    fixture.handler(navigateEvent({ viewId: "shopify" }));
+
+    expect(fixture.setTab).toHaveBeenCalledWith("views");
+    expect(fixture.navigatePath).toHaveBeenCalledWith("/shopify");
+  });
+
   it("falls through to plain navigation when open-window is requested without a viewId", () => {
     const fixture = createHandlerFixture();
 
@@ -126,6 +145,7 @@ describe("createNavigateViewHandler guard + fallthrough branches", () => {
     // The open-window branch requires a viewId; without one it must not call
     // the desktop bridge and instead navigate the resolved path in-page.
     expect(fixture.invokeDesktopBridgeRequest).not.toHaveBeenCalled();
+    expect(fixture.setTab).toHaveBeenCalledWith("apps");
     expect(fixture.navigatePath).toHaveBeenCalledWith("/apps/remote-ledger");
   });
 });

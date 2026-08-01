@@ -84,6 +84,7 @@ import {
   GLASS_SHEET_BACKDROP_FILTER,
   GLASS_SHEET_FILL,
 } from "../../glass/tokens";
+import type { ViewRegistryEntry } from "../../hooks/useAvailableViews";
 import {
   LAYOUT_SHIFT_INTENT_ATTR,
   LAYOUT_SHIFT_INTENT_TRANSIENT,
@@ -116,6 +117,12 @@ beforeAll(() => {
     label: "Polymarket",
     path: "/polymarket",
     tabAffinity: "inventory",
+  });
+  registerAppShellPage({
+    id: "notes",
+    pluginId: "@elizaos/plugin-simple-views",
+    label: "Notes",
+    path: "/notes",
   });
 });
 
@@ -175,6 +182,24 @@ function makeController(
     ...overrides,
   } as unknown as ShellController;
 }
+
+const POLYMARKET_VIEW: ViewRegistryEntry = {
+  id: "polymarket",
+  label: "Polymarket",
+  available: true,
+  pluginName: "@elizaos/plugin-polymarket",
+  path: "/polymarket",
+  viewType: "gui",
+};
+
+const SHOPIFY_VIEW: ViewRegistryEntry = {
+  id: "shopify",
+  label: "Shopify",
+  available: true,
+  pluginName: "@elizaos/plugin-shopify",
+  path: "/shopify",
+  viewType: "gui",
+};
 
 /**
  * The app composition seam around the overlay, reproduced minimally: the
@@ -826,16 +851,42 @@ describe("ChatOverlay", () => {
     [
       "an explicit registered route",
       { viewId: "polymarket", viewPath: "/polymarket" },
+      "inventory",
+      [POLYMARKET_VIEW],
     ],
-    ["a direct registered view id", { viewId: "polymarket" }],
+    [
+      "a direct registered view id",
+      { viewId: "polymarket" },
+      "inventory",
+      [POLYMARKET_VIEW],
+    ],
+    [
+      "a canonical built-in alias",
+      { viewId: "apps", viewPath: "/apps" },
+      "my-apps",
+      [],
+    ],
+    [
+      "a direct network-only view id",
+      { viewId: "shopify" },
+      "views",
+      [SHOPIFY_VIEW],
+    ],
+    [
+      "a path-only open-window fallback",
+      { viewPath: "/apps/remote-ledger", action: "open-window" },
+      "apps",
+      [],
+    ],
   ])(
-    "preserves focused typing through %s with a different tab affinity",
-    (_label, target) => {
+    "preserves focused typing through %s using App's resolved tab",
+    (_label, target, currentTab, availableViews) => {
       const { rerender } = render(
         <ChatOverlay
           controller={makeController({
             currentTab: "chat",
           } as Partial<ShellController>)}
+          availableViews={availableViews}
         />,
       );
       const composer = screen.getByLabelText("message");
@@ -851,8 +902,9 @@ describe("ChatOverlay", () => {
       rerender(
         <ChatOverlay
           controller={makeController({
-            currentTab: "inventory",
+            currentTab,
           } as Partial<ShellController>)}
+          availableViews={availableViews}
         />,
       );
       expect(document.activeElement).toBe(composer);

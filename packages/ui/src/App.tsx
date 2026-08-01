@@ -2005,6 +2005,7 @@ function ShellFoundationMount() {
  */
 function ChatOverlayMount(): ReactNode {
   const controller = useShellControllerContext();
+  const { views: availableViews } = useRoutableViews();
   const { characterData, agentStatus, firstRunComplete } =
     useAppSelectorShallow((s) => ({
       characterData: s.characterData,
@@ -2032,6 +2033,7 @@ function ChatOverlayMount(): ReactNode {
       agentName={agentName}
       slash={slash}
       firstRunOpen={firstRunComplete === false}
+      availableViews={availableViews}
     />
   );
 }
